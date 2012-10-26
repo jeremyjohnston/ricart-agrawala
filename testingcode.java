@@ -8,7 +8,7 @@
 		else if (nodeNum == 3)
 			nodeName = "R";		
 		else if (nodeNum == 4)
-			nodeName = "R";
+			nodeName = "S";
 		else
 			nodeName = "Node " + nodeNum;
 		
@@ -17,8 +17,9 @@
 			BufferedWriter criticalSection = new BufferedWriter(new FileWriter("CriticalSectionOutput"));
 			
 			criticalSection.write(nodeName + " started critical section access");
+			Thread.sleep(100);
 			//criticalSection.write(nodeName + " has now accessed it's critical section " + numberOfWrites + " times.");
-			criticalSection.write(nodeName + " ended critical section access at" + System.currentTimeMillis());
+			criticalSection.write(nodeName + " ended critical section access");
 			criticalSection.flush(); //flush stream
 			criticalSection.close(); //close write
 		} 
@@ -36,7 +37,7 @@
 		else if (nodeNum == 3)
 			nodeName = "R";
 		else if (nodeNum == 4)
-			nodeName = "R";
+			nodeName = "S";
 		else
 			nodeName = "Node " + nodeNum;
 		
@@ -48,7 +49,7 @@
 		else if (OtherNodeNum == 3)
 			otherNodeNum = "R";
 		else if (nodeNum == 4)
-			nodeName = "R";
+			nodeName = "S";
 		else
 			otherNodeNum = "Node " + nodeNum;
 		

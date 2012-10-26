@@ -38,23 +38,63 @@ public class RicartAgrawala {
 	
 	/** Invocation (begun in driver module with request CS) */
 	public boolean invocation(){
+		
 		bRequestingCS = true;
 		seqNum = highestSeqNum + 1;
+		System.out.println("=================Invocation with seq. num " + seqNum);
 		outstandingReplies = channelCount;
 		
-		for(int i = 1; i <= channelCount; i++){
+		for(int i = 1; i <= channelCount + 1; i++){
 			if(i != nodeNum){
 				requestTo(seqNum, nodeNum, i);
 			}
 		}
 		
 		
-		while(outstandingReplies > 0){/*wait until we have replies from all other processes */}
-	
+		while(outstandingReplies > 0)
+		{
+			try{
+				Thread.sleep(5);
+				//System.out.println("Looping: Outstanding replies = " + outstandingReplies);
+			}
+			catch(Exception e){
+				
+			}
+			/*wait until we have replies from all other processes */
+		}
+		//System.out.println("OUTSTANDING REPLIES ARE 0 FOOL");
+		//driverModule.criticalSection(nodeNum, 5);
+		//dummyCritical(nodeNum, 5);
+		//releaseCS();
 		//We return when ready to enter CS
 		return true;
 		
 		
+	}
+	
+	public void dummyCritical(int nodeNum, int numberOfWrites)
+	{
+		String nodeName = "";
+		if(nodeNum == 1)
+			nodeName = "P";
+		else if (nodeNum == 2)
+			nodeName = "Q";
+		else if (nodeNum == 3)
+			nodeName = "R";		
+		else if (nodeNum == 4)
+			nodeName = "S";
+		else
+			nodeName = "Node " + nodeNum;
+		
+		try{
+			System.out.println(nodeName + " started critical section access");
+			Thread.sleep(100);
+			System.out.println(nodeName + " ended critical section access");
+		}
+		catch(Exception ex)
+		{
+			System.out.println("Oh No! Something Has Gone Horribly Wrong");
+		}
 	}
 	
 	// The other half of invocation
@@ -62,10 +102,13 @@ public class RicartAgrawala {
 	{
 		bRequestingCS = false;
 		
-		for(int i = 1; i <= channelCount; i++){
+		for(int i = 0; i < channelCount; i++){
 			if(replyDeferred[i]){
 				replyDeferred[i] = false;
-				replyTo(i);
+				if(i < (nodeNum - 1))
+					replyTo(i + 1);
+				else
+					replyTo(i + 2);
 			}
 		}
 	}
@@ -77,15 +120,20 @@ public class RicartAgrawala {
 	 * 
 	 */
 	public void receiveRequest(int j, int k){
+		System.out.println("Received request from node " + k + ", sequence num. " + j);
 		boolean bDefer = false;
 		
 		highestSeqNum = Math.max(highestSeqNum, j);
 		bDefer = bRequestingCS && ((j > seqNum) || (j == seqNum && k > nodeNum));
-		
 		if(bDefer){
-			replyDeferred[k] = true;
+			System.out.println("Deferred sending message to " + k);
+			if(k > nodeNum)
+				replyDeferred[k - 2] = true;
+			else
+				replyDeferred[k - 1] = true;
 		}
-		else{  
+		else{ 
+			System.out.println("Sent reply message to " + k);
 			replyTo(k);
 		}
 		
@@ -94,16 +142,33 @@ public class RicartAgrawala {
 	/** Receiving Replies */
 	public void receiveReply(){
 		outstandingReplies = Math.max((outstandingReplies - 1), 0);
+		System.out.println("Outstanding replies: " + outstandingReplies);
 	}
 	
 	public void replyTo(int k)
 	{
-		w[k-1].println("REPLY," + k);	
+		System.out.println("Sending REPLY to node " + k);
+		if(k > nodeNum)
+		{
+			w[k-2].println("REPLY," + k);
+		}
+		else
+		{
+			w[k-1].println("REPLY," + k);
+		}
 	}
 	
 	public void requestTo(int seqNum, int nodeNum, int i)
 	{
-		w[i-1].println("REQUEST," + seqNum + "," + nodeNum);
+		System.out.println("Sending REQUEST to node " + (((i))));
+		if(i > nodeNum)
+		{
+			w[i-2].println("REQUEST," + seqNum + "," + nodeNum);
+		}
+		else
+		{
+			w[i-1].println("REQUEST," + seqNum + "," + nodeNum);
+		}
 	}
 
 }

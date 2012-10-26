@@ -10,7 +10,7 @@ public class Driver
 	PrintWriter w3;
 	
 	//For convenience in accessing channels; will contain our writers above
-	ArrayList<PrintWriter> outputStreams;
+	ArrayList<PrintWriter> outputStreams = new ArrayList<PrintWriter>();
 	
 	//Readers that will be passed to a separate thread of execution each
 	BufferedReader r1;
@@ -23,12 +23,13 @@ public class Driver
 	RicartAgrawala me;
 	
 	int numberOfWrites;
-	int writeLimit = 100; // number of times to try CS
-	int csDelay = 1000; //wait delay between CS tries in ms
+	int writeLimit = 5; // number of times to try CS
+	int csDelay = 200; //wait delay between CS tries in ms
 
 	/** Start the driver, with a number of channels specified. **/
 	public Driver(String args[])
 	{
+		System.out.println("\n\n\n");
 		final boolean desireToHarmHumansOrThroughInactionAllowHumansToComeToHarm = false; //Just in case
 		
 		//Some defaults
@@ -48,7 +49,7 @@ public class Driver
 				network3 = args[3];
 			}
 		}*/
-
+		
 		numberOfWrites = 0;
 
 		// Set up our sockets with our peer nodes
@@ -63,10 +64,15 @@ public class Driver
 			
 			if(nodeNum == 1)
 			{
+				//Clear the file
+				BufferedWriter clearWrite = new BufferedWriter(new FileWriter("CriticalSectionOutput.txt"));
+				clearWrite.write("\n");
+				clearWrite.close();
+				
 				System.out.println("Node 1 here");
-				ss1 = new ServerSocket(4441); //ServerSocket for net02
-				ss2 = new ServerSocket(4442); //ServerSocket for net03
-				ss3 = new ServerSocket(4443); //ServerSocket for net04
+				ss1 = new ServerSocket(4461); //ServerSocket for net02
+				ss2 = new ServerSocket(4462); //ServerSocket for net03
+				ss3 = new ServerSocket(4463); //ServerSocket for net04
 				s1 = ss1.accept();
 				s2 = ss2.accept();
 				s3 = ss3.accept();
@@ -74,9 +80,9 @@ public class Driver
 			else if(nodeNum == 2)
 			{
 				System.out.println("Node 2 here");
-				s1 = new Socket("net01.utdallas.edu", 4441); //ClientSocket for net01
-				ss2 = new ServerSocket(4442); //ServerSocket for net03
-				ss3 = new ServerSocket(4443); //ServerSocket for net04
+				s1 = new Socket("net01.utdallas.edu", 4461); //ClientSocket for net01
+				ss2 = new ServerSocket(4462); //ServerSocket for net03
+				ss3 = new ServerSocket(4463); //ServerSocket for net04
 				
 				s2 = ss2.accept();
 				s3 = ss3.accept();
@@ -84,18 +90,18 @@ public class Driver
 			else if(nodeNum == 3)
 			{
 				System.out.println("Node 3 here");
-				s1 = new Socket("net01.utdallas.edu", 4442); //ClientSocket for net01
-				s2 = new Socket("net02.utdallas.edu", 4442); //ClientSocket for net02
-				ss3 = new ServerSocket(4443); //ServerSocket for net04
+				s1 = new Socket("net01.utdallas.edu", 4462); //ClientSocket for net01
+				s2 = new Socket("net06.utdallas.edu", 4462); //ClientSocket for net02
+				ss3 = new ServerSocket(4463); //ServerSocket for net04
 				
 				s3 = ss3.accept();
 			}
 			else
 			{
 				System.out.println("Node 4 here");
-				s1 = new Socket("net01.utdallas.edu", 4443);
-				s2 = new Socket("net02.utdallas.edu", 4443);
-				s3 = new Socket("net03.utdallas.edu", 4443);
+				s1 = new Socket("net01.utdallas.edu", 4463);
+				s2 = new Socket("net06.utdallas.edu", 4463);
+				s3 = new Socket("net03.utdallas.edu", 4463);
 			}
 			
 			System.out.println("Created all sockets");
@@ -109,7 +115,7 @@ public class Driver
 			r3 = new BufferedReader(new InputStreamReader(s3.getInputStream()));			
 			
 			//VERIFYING SOCKET COMMUNICATION
-			w1.println("Writing to socket 1...\n");
+			/*w1.println("Writing to socket 1...\n");
 			w2.println("Writing to socket 2...\n");
 			w3.println("Writing to socket 3...\n");
 			
@@ -117,7 +123,7 @@ public class Driver
 			
 			String message1 = r1.readLine();
 			
-			System.out.println("Read from socket 1: " + message1);
+			System.out.println("Read from socket 1: " + message1);*/
 			
 			//Let's store our writers in a list
 			outputStreams.add(w1);
@@ -125,7 +131,7 @@ public class Driver
 			outputStreams.add(w3);
 			
 			// Create the ME object with priority of 'nodeNum' and initial sequence number 0
-			RicartAgrawala me = new RicartAgrawala(nodeNum, 0, this);
+			me = new RicartAgrawala(nodeNum, 0, this);
 			me.w[0] = w1;
 			me.w[1] = w2;
 			me.w[2] = w3;
@@ -145,24 +151,102 @@ public class Driver
 		catch(Exception ex){ ex.printStackTrace();}
 
 		//Launch thread that occasionally calls requestCS(me) and attempts CS
-		Thread tCS = new Thread(new CSHandler());
-		tCS.start();
+		/*Thread tCS = new Thread(new CSHandler());
+		tCS.start();*/
 		
-
+		while(numberOfWrites < writeLimit)
+		{
+			try{
+				System.out.println("Requesting critical section...");
+				requestCS();
+				numberOfWrites++;
+				Random num = new Random();
+				Thread.sleep(num.nextInt(500));
+				//Thread.sleep(csDelay);
+			}
+			catch(InterruptedException e){
+				System.out.println(e.getMessage());
+			}
+		}
 	}
 
 	/** Invocation of Critical Section*/
 	public static boolean criticalSection(int nodeNum, int numberOfWrites)
 	{
+		/*String nodeName = "";
+		if(nodeNum == 1)
+			nodeName = "P";
+		else if (nodeNum == 2)
+			nodeName = "Q";
+		else if (nodeNum == 3)
+			nodeName = "R";		
+		else if (nodeNum == 4)
+			nodeName = "S";
+		else
+			nodeName = "Node " + nodeNum;
+		
+		try{
+			System.out.println(nodeNum + " started critical section access");
+			Thread.sleep(100);
+			System.out.println(nodeNum + " ended critical section access");
+		}
+		catch(Exception ex)
+		{
+			System.out.println("Oh No! Something Has Gone Horribly Wrong");
+		}*/
+		
 		try
 		{
-			BufferedWriter criticalSection = new BufferedWriter(new FileWriter("CriticalSectionOutput"));
-			criticalSection.write("Node" + nodeNum + " has now accessed its critical section " + numberOfWrites + " times.");
+			BufferedWriter criticalSection = new BufferedWriter(new FileWriter("CriticalSectionOutput.txt", true));
+			
+			criticalSection.write(nodeNum + " started critical section access");
+			criticalSection.newLine();
+			Thread.sleep(100);
+			//criticalSection.write(nodeName + " has now accessed it's critical section " + numberOfWrites + " times.");
+			criticalSection.write(nodeNum + " ended critical section access");
+			criticalSection.newLine();
+			criticalSection.newLine();
 			criticalSection.flush(); //flush stream
 			criticalSection.close(); //close write
 		} 
-		catch(IOException e){ System.out.println("Oh No! Something Has Gone Horribly Wrong");}
+		catch(Exception e){ System.out.println("Oh No! Something Has Gone Horribly Wrong");}
 		return true;
+	}
+	
+	public static void deferReport(int nodeNum, int otherNodeNum, int numberOfWrites, int seqNum)
+	{
+		String nodeName = "";
+		if(nodeNum == 1)
+			nodeName = "P";
+		else if (nodeNum == 2)
+			nodeName = "Q";
+		else if (nodeNum == 3)
+			nodeName = "R";
+		else if (nodeNum == 4)
+			nodeName = "S";
+		else
+			nodeName = "Node " + nodeNum;
+		
+		String otherNodeName = "";
+		if(otherNodeNum == 1)
+			otherNodeName = "P";
+		else if (otherNodeNum == 2)
+			otherNodeName = "Q";
+		else if (otherNodeNum == 3)
+			otherNodeName = "R";
+		else if (nodeNum == 4)
+			otherNodeName = "S";
+		else
+			otherNodeName = "Node " + nodeNum;
+		
+		try
+		{
+			BufferedWriter deferRecord = new BufferedWriter(new FileWriter(nodeName +"DefersTo" + otherNodeName));
+			deferRecord.write(nodeName + " defered to otherNodeName" + "(Sequence number: " + seqNum + ")");
+			deferRecord.flush(); //flush stream
+			deferRecord.close(); //close write
+		} 
+		catch(IOException e){ System.out.println("Oh No! Something Has Gone Horribly Wrong");}
 	}
 
 	/**
@@ -236,7 +320,7 @@ public class Driver
 			try
 			{
 				//As long as this reader is open, will take action the moment a message arrives.
-				while( ( message = reader.readLine() ) != null)
+				while(( message = reader.readLine() ) != null)
 				{
 					System.out.println("I, node " + nodeNum + ", received message: " + message);
 					
@@ -265,7 +349,7 @@ public class Driver
 		}
 	}
 	
-	class CSHandler implements Runnable
+	/*class CSHandler implements Runnable
 	{
 		public CSHandler()
 		{
@@ -285,7 +369,7 @@ public class Driver
 				}
 			}
 		}
-	}
+	}*/
 	
 	public static void main(String[] args) 
 	{
