@@ -4,28 +4,41 @@ import java.util.*;
 
 public class Driver 
 {
+	//Writers
 	PrintWriter w1;
 	PrintWriter w2;
 	PrintWriter w3;
+	
+	//For convenience in accessing channels; will contain our writers above
+	ArrayList outputStreams;
+	
+	//Readers that will be passed to a separate thread of execution each
 	BufferedReader r1;
 	BufferedReader r2;
 	BufferedReader r3;
+	
+	// Our mutual exclusion algorithm object for this node
+	RicartAgrawala me;
+	
+	int numberOfWrites;
+	int writeLimit = 100; // number of times to try CS
+	int csDelay = 1000; //wait delay between CS tries in ms
 
 	/** Start the driver, with a number of channels specified. **/
-	public Driver(String[] args)
+	public Driver(String args[])
 	{
-		final boolean desireToHarmHumansOrThroughInactionAllowHumansToComeToHarm = false;
-		//Just in case
+		final boolean desireToHarmHumansOrThroughInactionAllowHumansToComeToHarm = false; //Just in case
 		
-		int nodeNum = 1;
-		int portNumber = 3009; //Default
-		String network2 = "net02.utdallas.edu"; //Default network for one of the other nodes
-		String network3 = "net03.utdallas.edu"; //Default network for one of the other nodes
+		//Some defaults
+		int nodeNum = 0;
+		int portNumber = 3009;
+		String network2 = "net02.utdallas.edu"; //Default network for one of the other nodes (not necessarily the actual 'node 2')
+		String network3 = "net03.utdallas.edu"; //Default network for one of the other nodes (ditto for 3)
 
-		if(args.length != 0)
+		if(args.length > 1)
 		{
 			nodeNum = Integer.parseInt(args[0]);
-			//portNumber = Integer.parseInt(args[1]);
+			portNumber = Integer.parseInt(args[1]);
 			
 			if (args.length > 2)
 			{
@@ -34,13 +47,9 @@ public class Driver
 			}
 		}
 
-		int numberOfWrites = 0;
+		numberOfWrites = 0;
 
-		//RicartAgrawala me = new RicartAgrawala(nodeNum, 0);
-
-
-		//TODO: Rather than assuming connections and passing number of processes, have processes register with the 0th process
-
+		// Set up our sockets with our peer nodes
 		try
 		{
 			ServerSocket ss1;
@@ -88,6 +97,8 @@ public class Driver
 			}
 			
 			System.out.println("Created all sockets");
+			
+			//With the sockets done, create our readers and writers
 			w1 = new PrintWriter(s1.getOutputStream(), true);
 			w2 = new PrintWriter(s2.getOutputStream(), true);
 			w3 = new PrintWriter(s3.getOutputStream(), true);
@@ -95,21 +106,46 @@ public class Driver
 			r2 = new BufferedReader(new InputStreamReader(s2.getInputStream()));
 			r3 = new BufferedReader(new InputStreamReader(s3.getInputStream()));			
 			
-			//TESTING SOCKET COMMUNICATION
+			//VERIFYING SOCKET COMMUNICATION
 			w1.println("Writing to socket 1...\n");
 			w2.println("Writing to socket 2...\n");
 			w3.println("Writing to socket 3...\n");
 			
-			System.out.println("Wrote to sockets");
+			System.out.println("Wrote to sockets for verification step");
 			
 			String message1 = r1.readLine();
 			
 			System.out.println("Read from socket 1: " + message1);
+			
+			//Let's store our writers in a list
+			outputStreams.add(w1);
+			outputStreams.add(w2);
+			outputStreams.add(w3);
+			
+			// Create the ME object with priority of 'nodeNum' and initial sequence number 0
+			RicartAgrawala me = new RicartAgrawala(nodeNum, 0);
+			me.w[0] = w1;
+			me.w[1] = w2;
+			me.w[2] = w3;
+			
+			
+			//And let's start some threads to read our sockets
+			Thread t1 = new Thread(new ChannelHandler(s1));
+			t1.start();
+			
+			Thread t2 = new Thread(new ChannelHandler(s2));
+			t2.start();
+			
+			Thread t3 = new Thread(new ChannelHandler(s3));
+			t3.start();
+			
 		}
 		catch(Exception ex){ ex.printStackTrace();}
 
 		//Launch thread that occasionally calls requestCS(me) and attempts CS
-		//Also thread to read channels
+		Thread tCS = new Thread(new CSHandler(nodeNum));
+		tCS.start();
+		
 
 	}
 
@@ -127,17 +163,124 @@ public class Driver
 		return true;
 	}
 
-	public void requestCS(RicartAgrawala me)
+	/**
+	* Interface method between Driver and RicartAgrawala
+	*/
+	public void requestCS()
 	{
+		//TODO: possibly needs own thread to execute
 		me.invocation();
-		//w1.println("REQUEST,"+ me.nodeNum);
+		
+		//After invocation returns, we can safely call CS
+		criticalSection(nodeNum, numberOfWrites);
+		
+		//Once we are done with CS, release CS
+		me.releaseCS();
 	}
 
-	public void releaseCS(RicartAgrawala me)
+	/**
+	* Broadcasts a message to all writers in the outputStreams arraylist.
+	* Note this should probably never be used as RicartAgrawala is unicast
+	*/
+	public void broadcast(String message)
 	{
-		//w1.println("RELEASE,"+ me.nodeNum);
+		Iterator it = outputStreams.iterator();
+		
+		while(it.hasNext())
+		{
+			try
+			{
+				PrintWriter writer = (PrintWriter) it.next();
+				writer.println(message);
+				writer.flush();
+			}
+			catch(Exception ex)
+			{
+				ex.printStackTrace();
+			}
+		}
 	}
-
+	
+	
+	
+	/**
+	* Given a socket, it continuously reads from the 
+	* socket and passes key information to the ME object.
+	*/
+	public class ChannelHandler implements Runnable
+	{
+		BufferedReader reader;
+		PrintWriter writer;
+		Socket sock;
+	
+		public ChannelHandler(Socket s)
+		{
+			try
+			{
+				sock = s;
+				InputStreamReader iReader = new InputStreamReader(sock.getInputStream());
+				reader = new BufferedReader(iReader);
+				
+			}catch(Exception ex)
+			{
+				ex.printStackTrace();
+			}
+		}
+	
+		/** Continuously runs and reads all incoming messages, passing messages to ME */
+		// TODO: Possibly move this to RicartAgrawala for module separation
+		public void run()
+		{
+			String message;
+			
+			try
+			{
+				//As long as this reader is open, will take action the moment a message arrives.
+				while( ( message = reader.readLine() ) != null)
+				{
+					System.out.println("I, node " + nodeNum + ", received message: " + message);
+					
+					//Tokenize our message to determine RicartAgrawala step
+					
+					String tokens[] = message.split(",");
+					String messageType = tokens[0];
+					
+					if(messageType.equals("REQUEST");)
+					{
+						/*We are receiving request(j,k) where j is a seq# and k a node#.
+						  This call will decide to defer or ack with a reply. */
+						me.receiveRequest(Integer.parseInt(tokens[1]), Integer.parseInt(tokens[2]));
+					}
+					else if(messageType.equals("REPLY"))
+					{
+						/* Received a reply. We'll decrement our outstanding replies */
+						me.receiveReply();
+					}
+				}
+			
+			}catch(Exception ex)
+			{
+				ex.printStackTrace();
+			}
+		}
+	}
+	
+	public class CSHandler implements Runnable
+	{
+		public CSHandler()
+		{
+		}
+		
+		public void run()
+		{
+			while(numberOfWrites < writeLimit)
+			{
+				requestCS();
+				Thread.sleep(csDelay);
+			}
+		}
+	}
+	
 	public static void main(String[] args) 
 	{
 		new Driver(args);	

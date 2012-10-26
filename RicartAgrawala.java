@@ -8,49 +8,63 @@ public class RicartAgrawala {
 	public int highestSeqNum;
 	public int seqNum;
 	public int nodeNum;
-	public int channelCount; // 1 channel per other channel; our 'N'
+	
+	//Holds our writers to use
+	public PrintWriters[] w;
+	
+	//Hard coded to 3 right now, for 2 other nodes in network
+	public int channelCount = 3;
+	
 	public boolean[] replyDeferred;
 	
-	public RicartAgrawala(int nodeNum, int seqNum){
+	public RicartAgrawala(int nodeNum, int seqNum, Driver driverModule){
 		bRequestingCS = false;
 		
-		// TODO: 0 for now; needs to be number of channels minus one
 		outstandingReplies = channelCount;
 		
 		highestSeqNum = 0;
 		this.seqNum = seqNum;
+		this.driverModule = driverModule;
 		
-		// TODO: Need some way to communicate to all processes their unique priority, or node, number
+		w = new PrintWriters[channelCount];
+		
+		// Node number is also used for priority (low node # == higher priority in RicartAgrawala scheme)
+		// Node numbers are [1,channelCount]; since we're starting at 1 check for errors trying to access node '0'.
 		this.nodeNum = nodeNum;
 		
 		replyDeferred = new boolean[channelCount];
 	}
 	
 	/** Invocation (begun in driver module with request CS) */
-	public void invocation(){
+	public boolean invocation(){
 		bRequestingCS = true;
 		seqNum = highestSeqNum + 1;
 		outstandingReplies = channelCount;
 		
-		for(int i = 0; i < channelCount; i++){
+		for(int i = 1; i <= channelCount; i++){
 			if(i != nodeNum){
-				//send(REQUEST(seqNum, nodeNum), i);
+				requestTo(seqNum, nodeNum, i);
 			}
 		}
 		
 		
 		while(outstandingReplies > 0){/*wait until we have replies from all other processes */}
 	
-		//TODO: Critical Section here
+		//We return when ready to enter CS
+		return true;
 		
-		//release CS
 		
+	}
+	
+	// The other half of invocation
+	public void releaseCS()
+	{
 		bRequestingCS = false;
 		
-		for(int i = 0; i < channelCount; i++){
+		for(int i = 1; i <= channelCount; i++){
 			if(replyDeferred[i]){
 				replyDeferred[i] = false;
-				//send(REPLY, i);
+				replyTo(i);
 			}
 		}
 	}
@@ -68,12 +82,10 @@ public class RicartAgrawala {
 		bDefer = bRequestingCS && ((j > seqNum) || (j == seqNum && k > nodeNum));
 		
 		if(bDefer){
-			//TODO: Implement a structure to track deferred messages
 			replyDeferred[k] = true;
 		}
-		else{
-			//TODO: Create a means to handle incoming messages and parse the message type, to then send to the right method.     
-			//send(REPLY, k);
+		else{  
+			replyTo(k);
 		}
 		
 	}
@@ -81,6 +93,16 @@ public class RicartAgrawala {
 	/** Receiving Replies */
 	public void receiveReply(){
 		outstandingReplies = Math.max((outstandingReplies - 1), 0);
+	}
+	
+	public void replyTo(int k)
+	{
+		w[k-1].println("REPLY," + k);	
+	}
+	
+	public void requestTo(int seqNum, int nodeNum, int i)
+	{
+		w[i-1].println("REQUEST," + seqNum + "," + nodeNum);
 	}
 
 }
