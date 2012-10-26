@@ -1,8 +1,12 @@
 ricart-agrawala
 ===============
 
-
 Implementation of Ricart-Agrawala's mutual exclusion algorithm.
+
+Group Members: 
+David A. Sanders, Jr 
+James Sanderlin
+Jeremy Johnston
 
 To test our implementation of Ricart-Agrawala's mutual exclusion algorithm you'll need to put Driver.java and RicartAgrawala.java into the directory to be used. Then use 4 terminals to ssh into net01.utdallas.edu, net06.utdallas.edu, net03.utdallas.edu and net04.utdallas.edu. (net02.utdallas.edu was down when we were testing this)
 

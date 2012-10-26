@@ -41,7 +41,7 @@ public class RicartAgrawala {
 		
 		bRequestingCS = true;
 		seqNum = highestSeqNum + 1;
-		System.out.println("=================Invocation with seq. num " + seqNum);
+		
 		outstandingReplies = channelCount;
 		
 		for(int i = 1; i <= channelCount + 1; i++){
@@ -55,46 +55,18 @@ public class RicartAgrawala {
 		{
 			try{
 				Thread.sleep(5);
-				//System.out.println("Looping: Outstanding replies = " + outstandingReplies);
+				
 			}
 			catch(Exception e){
 				
 			}
 			/*wait until we have replies from all other processes */
 		}
-		//System.out.println("OUTSTANDING REPLIES ARE 0 FOOL");
-		//driverModule.criticalSection(nodeNum, 5);
-		//dummyCritical(nodeNum, 5);
-		//releaseCS();
+
 		//We return when ready to enter CS
 		return true;
 		
 		
-	}
-	
-	public void dummyCritical(int nodeNum, int numberOfWrites)
-	{
-		String nodeName = "";
-		if(nodeNum == 1)
-			nodeName = "P";
-		else if (nodeNum == 2)
-			nodeName = "Q";
-		else if (nodeNum == 3)
-			nodeName = "R";		
-		else if (nodeNum == 4)
-			nodeName = "S";
-		else
-			nodeName = "Node " + nodeNum;
-		
-		try{
-			System.out.println(nodeName + " started critical section access");
-			Thread.sleep(100);
-			System.out.println(nodeName + " ended critical section access");
-		}
-		catch(Exception ex)
-		{
-			System.out.println("Oh No! Something Has Gone Horribly Wrong");
-		}
 	}
 	
 	// The other half of invocation
@@ -120,7 +92,7 @@ public class RicartAgrawala {
 	 * 
 	 */
 	public void receiveRequest(int j, int k){
-		System.out.println("Received request from node " + k + ", sequence num. " + j);
+		System.out.println("Received request from node " + k);
 		boolean bDefer = false;
 		
 		highestSeqNum = Math.max(highestSeqNum, j);
@@ -142,7 +114,7 @@ public class RicartAgrawala {
 	/** Receiving Replies */
 	public void receiveReply(){
 		outstandingReplies = Math.max((outstandingReplies - 1), 0);
-		System.out.println("Outstanding replies: " + outstandingReplies);
+		//System.out.println("Outstanding replies: " + outstandingReplies);
 	}
 	
 	public void replyTo(int k)
