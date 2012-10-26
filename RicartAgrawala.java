@@ -1,4 +1,4 @@
-
+import java.io.*;
 //TODO: Perhaps make runnable to run in a thread
 
 public class RicartAgrawala {
@@ -8,11 +8,12 @@ public class RicartAgrawala {
 	public int highestSeqNum;
 	public int seqNum;
 	public int nodeNum;
+	public Driver driverModule;
 	
 	//Holds our writers to use
-	public PrintWriters[] w;
+	public PrintWriter[] w;
 	
-	//Hard coded to 3 right now, for 2 other nodes in network
+	//Hard coded to 3 right now, for 3 other nodes in network
 	public int channelCount = 3;
 	
 	public boolean[] replyDeferred;
@@ -26,7 +27,7 @@ public class RicartAgrawala {
 		this.seqNum = seqNum;
 		this.driverModule = driverModule;
 		
-		w = new PrintWriters[channelCount];
+		w = new PrintWriter[channelCount];
 		
 		// Node number is also used for priority (low node # == higher priority in RicartAgrawala scheme)
 		// Node numbers are [1,channelCount]; since we're starting at 1 check for errors trying to access node '0'.

@@ -10,12 +10,14 @@ public class Driver
 	PrintWriter w3;
 	
 	//For convenience in accessing channels; will contain our writers above
-	ArrayList outputStreams;
+	ArrayList<PrintWriter> outputStreams;
 	
 	//Readers that will be passed to a separate thread of execution each
 	BufferedReader r1;
 	BufferedReader r2;
 	BufferedReader r3;
+	
+	int nodeNum;
 	
 	// Our mutual exclusion algorithm object for this node
 	RicartAgrawala me;
@@ -30,12 +32,12 @@ public class Driver
 		final boolean desireToHarmHumansOrThroughInactionAllowHumansToComeToHarm = false; //Just in case
 		
 		//Some defaults
-		int nodeNum = 0;
-		int portNumber = 3009;
+		nodeNum = Integer.parseInt(args[0]);
+		//int portNumber = 3009;
 		String network2 = "net02.utdallas.edu"; //Default network for one of the other nodes (not necessarily the actual 'node 2')
 		String network3 = "net03.utdallas.edu"; //Default network for one of the other nodes (ditto for 3)
 
-		if(args.length > 1)
+		/*if(args.length > 1)
 		{
 			nodeNum = Integer.parseInt(args[0]);
 			portNumber = Integer.parseInt(args[1]);
@@ -45,7 +47,7 @@ public class Driver
 				network2 = args[2];
 				network3 = args[3];
 			}
-		}
+		}*/
 
 		numberOfWrites = 0;
 
@@ -123,7 +125,7 @@ public class Driver
 			outputStreams.add(w3);
 			
 			// Create the ME object with priority of 'nodeNum' and initial sequence number 0
-			RicartAgrawala me = new RicartAgrawala(nodeNum, 0);
+			RicartAgrawala me = new RicartAgrawala(nodeNum, 0, this);
 			me.w[0] = w1;
 			me.w[1] = w2;
 			me.w[2] = w3;
@@ -143,7 +145,7 @@ public class Driver
 		catch(Exception ex){ ex.printStackTrace();}
 
 		//Launch thread that occasionally calls requestCS(me) and attempts CS
-		Thread tCS = new Thread(new CSHandler(nodeNum));
+		Thread tCS = new Thread(new CSHandler());
 		tCS.start();
 		
 
@@ -184,13 +186,11 @@ public class Driver
 	*/
 	public void broadcast(String message)
 	{
-		Iterator it = outputStreams.iterator();
-		
-		while(it.hasNext())
+		for(int i = 0; i < outputStreams.size(); i++)
 		{
 			try
 			{
-				PrintWriter writer = (PrintWriter) it.next();
+				PrintWriter writer = outputStreams.get(i);
 				writer.println(message);
 				writer.flush();
 			}
@@ -207,7 +207,7 @@ public class Driver
 	* Given a socket, it continuously reads from the 
 	* socket and passes key information to the ME object.
 	*/
-	public class ChannelHandler implements Runnable
+	class ChannelHandler implements Runnable
 	{
 		BufferedReader reader;
 		PrintWriter writer;
@@ -245,7 +245,7 @@ public class Driver
 					String tokens[] = message.split(",");
 					String messageType = tokens[0];
 					
-					if(messageType.equals("REQUEST");)
+					if(messageType.equals("REQUEST"))
 					{
 						/*We are receiving request(j,k) where j is a seq# and k a node#.
 						  This call will decide to defer or ack with a reply. */
@@ -265,7 +265,7 @@ public class Driver
 		}
 	}
 	
-	public class CSHandler implements Runnable
+	class CSHandler implements Runnable
 	{
 		public CSHandler()
 		{
@@ -275,8 +275,14 @@ public class Driver
 		{
 			while(numberOfWrites < writeLimit)
 			{
-				requestCS();
-				Thread.sleep(csDelay);
+				try{
+					System.out.println("Requesting critical section...");
+					requestCS();
+					Thread.sleep(csDelay);
+				}
+				catch(InterruptedException e){
+					System.out.println(e.getMessage());
+				}
 			}
 		}
 	}
